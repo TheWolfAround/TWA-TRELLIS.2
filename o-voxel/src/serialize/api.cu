@@ -1,4 +1,5 @@
 #include <torch/extension.h>
+#include <c10/cuda/CUDAException.h>
 #include "api.h"
 #include "z_order.h"
 #include "hilbert.h"
@@ -101,6 +102,9 @@ z_order_encode_cuda(
     // Allocate output tensor
     torch::Tensor codes = torch::empty_like(x,  torch::dtype(torch::kInt32));
 
+    // Zero blocks is an invalid launch (cudaErrorInvalidValue), left pending for a later, unrelated CUDA call to raise.
+    if (x.size(0) == 0) return codes;
+
     // Call CUDA kernel
     CUDA::z_order_encode<<<(x.size(0) + BLOCK_SIZE - 1) / BLOCK_SIZE, BLOCK_SIZE>>>(
         x.size(0),
@@ -109,6 +113,7 @@ z_order_encode_cuda(
         reinterpret_cast<uint32_t*>(z.contiguous().data_ptr<int>()),
         reinterpret_cast<uint32_t*>(codes.data_ptr<int>())
     );
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     return codes;
 }
@@ -123,6 +128,9 @@ z_order_decode_cuda(
     torch::Tensor y = torch::empty_like(codes, torch::dtype(torch::kInt32));
     torch::Tensor z = torch::empty_like(codes, torch::dtype(torch::kInt32));
 
+    // Zero blocks is an invalid launch (cudaErrorInvalidValue), left pending for a later, unrelated CUDA call to raise.
+    if (codes.size(0) == 0) return std::make_tuple(x, y, z);
+
     // Call CUDA kernel
     CUDA::z_order_decode<<<(codes.size(0) + BLOCK_SIZE - 1) / BLOCK_SIZE, BLOCK_SIZE>>>(
         codes.size(0),
@@ -131,6 +139,7 @@ z_order_decode_cuda(
         reinterpret_cast<uint32_t*>(y.data_ptr<int>()),
         reinterpret_cast<uint32_t*>(z.data_ptr<int>())
     );
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     return std::make_tuple(x, y, z);
 }
@@ -145,6 +154,9 @@ hilbert_encode_cuda(
     // Allocate output tensor
     torch::Tensor codes = torch::empty_like(x);
 
+    // Zero blocks is an invalid launch (cudaErrorInvalidValue), left pending for a later, unrelated CUDA call to raise.
+    if (x.size(0) == 0) return codes;
+
     // Call CUDA kernel
     CUDA::hilbert_encode<<<(x.size(0) + BLOCK_SIZE - 1) / BLOCK_SIZE, BLOCK_SIZE>>>(
         x.size(0),
@@ -153,6 +165,7 @@ hilbert_encode_cuda(
         reinterpret_cast<uint32_t*>(z.contiguous().data_ptr<int>()),
         reinterpret_cast<uint32_t*>(codes.data_ptr<int>())
     );
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     return codes;
 }
@@ -167,6 +180,9 @@ hilbert_decode_cuda(
     torch::Tensor y = torch::empty_like(codes);
     torch::Tensor z = torch::empty_like(codes);
 
+    // Zero blocks is an invalid launch (cudaErrorInvalidValue), left pending for a later, unrelated CUDA call to raise.
+    if (codes.size(0) == 0) return std::make_tuple(x, y, z);
+
     // Call CUDA kernel
     CUDA::hilbert_decode<<<(codes.size(0) + BLOCK_SIZE - 1) / BLOCK_SIZE, BLOCK_SIZE>>>(
         codes.size(0),
@@ -175,6 +191,7 @@ hilbert_decode_cuda(
         reinterpret_cast<uint32_t*>(y.data_ptr<int>()),
         reinterpret_cast<uint32_t*>(z.data_ptr<int>())
     );
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     return std::make_tuple(x, y, z);
 }

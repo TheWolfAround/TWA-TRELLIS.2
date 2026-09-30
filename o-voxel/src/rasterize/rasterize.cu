@@ -2,6 +2,7 @@
 
 #include <cuda.h>
 #include "cuda_runtime.h"
+#include <c10/cuda/CUDAException.h>
 
 #include <cooperative_groups.h>
 namespace cg = cooperative_groups;
@@ -298,6 +299,7 @@ void forward(
         pt_depths.data_ptr<float>(),
         reinterpret_cast<uint32_t*>(pt_tiles_touched.data_ptr<int>())
     );
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     // Compute prefix sum over full list of touched tile counts by voxels
     // E.g., [2, 3, 0, 2, 1] -> [2, 5, 5, 7, 8]
@@ -318,6 +320,7 @@ void forward(
         pt_keys_unsorted.data_ptr<int64_t>(),
         reinterpret_cast<uint32_t*>(pt_indices_unsorted.data_ptr<int>())
     );
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     // Sort complete list of (duplicated) voxel indices by keys
     auto pt_sorted = torch::sort(pt_keys_unsorted, 0);
@@ -332,6 +335,7 @@ void forward(
         pt_keys.data_ptr<int64_t>(),
         reinterpret_cast<uint2*>(tile_ranges.data_ptr<int>())
     );
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     // Let each tile blend its range of voxels independently in parallel
     render<<<grid, block>>>(
@@ -342,6 +346,7 @@ void forward(
         positions, attrs, voxel_size,
         out_color, out_depth, out_alpha
     );
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
 
 
