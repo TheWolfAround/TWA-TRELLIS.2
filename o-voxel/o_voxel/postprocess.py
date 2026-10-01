@@ -7,7 +7,6 @@ from PIL import Image
 import trimesh
 import trimesh.visual
 from flex_gemm.ops.grid_sample import grid_sample_3d
-import nvdiffrast.torch as dr
 import cumesh
 
 
@@ -57,6 +56,11 @@ def to_glb(
         verbose: whether to print verbose messages
         use_tqdm: whether to use tqdm to display progress bar
     """
+    # Imported here, not at module level, so that `import o_voxel` does not require nvdiffrast:
+    # to_glb is the only user, and importers that never bake (the ComfyUI extension's decode path)
+    # must not pay for the dependency.
+    import nvdiffrast.torch as dr
+
     # --- Input Normalization (AABB, Voxel Size, Grid Size) ---
     if isinstance(aabb, (list, tuple)):
         aabb = np.array(aabb)
